@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
-import { SessionProvider } from './SessionProvider'
+import { StackAuthProvider } from './StackProvider'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
 import ChatWidget from '@/components/chat/ChatWidget'
@@ -230,7 +230,7 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
   }, [])
 
   return (
-    <SessionProvider>
+    <StackAuthProvider>
       <div className="flex min-h-screen flex-col bg-white dark:bg-gray-900">
         <InitialQuizGate />
         <Header />
@@ -240,7 +240,7 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
         <Footer />
         <ChatWidget />
       </div>
-    </SessionProvider>
+    </StackAuthProvider>
   )
 }
 

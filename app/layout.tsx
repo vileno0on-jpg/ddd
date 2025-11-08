@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { ClientLayout } from "@/components/providers/ClientLayout";
+import { StackAuthProvider } from "@/components/providers/StackProvider";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const inter = Inter({
@@ -36,9 +36,9 @@ export default function RootLayout({
     <html lang="en" className="scroll-smooth" suppressHydrationWarning>
       <body className={`${inter.variable} antialiased bg-white dark:bg-gray-900`} suppressHydrationWarning>
         <ErrorBoundary>
-          <ClientLayout>
+          <StackAuthProvider>
             {children}
-          </ClientLayout>
+          </StackAuthProvider>
         </ErrorBoundary>
       </body>
     </html>

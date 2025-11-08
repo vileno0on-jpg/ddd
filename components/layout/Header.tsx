@@ -4,14 +4,15 @@ import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import { Menu, X, User, LogOut, Shield, Settings } from 'lucide-react'
-import { useSession, signOut } from 'next-auth/react'
+import { useUser, useStackApp } from '@stackframe/stack'
 import { CONFIG } from '@/lib/config'
 import AdvancedSearch from '@/components/AdvancedSearch'
 import type { LayerType } from '@/lib/layerLogic'
 
 export default function Header() {
   const [isOpen, setIsOpen] = useState(false)
-  const { data: session, status } = useSession()
+  const user = useUser()
+  const stackApp = useStackApp()
   const [isDark, setIsDark] = useState(false)
   const pathname = usePathname()
   
@@ -93,7 +94,7 @@ export default function Header() {
     }, 300)
   }
 
-  const handleLogout = async () => {
+  const handleLogout = () => {
     try {
       localStorage.removeItem('userLayer')
       localStorage.removeItem('quizAnswers')
@@ -104,7 +105,8 @@ export default function Header() {
     document.cookie = 'userLayer=; path=/; max-age=0'
     document.cookie = 'quizCompleted=; path=/; max-age=0'
     document.cookie = 'countryOfOrigin=; path=/; max-age=0'
-    await signOut({ callbackUrl: '/' })
+    // Stack Auth handles logout via redirect to protected route
+    window.location.href = '/auth/login'
   }
 
   const openQuiz = () => {
@@ -113,12 +115,12 @@ export default function Header() {
     }
   }
 
-  const user = session?.user ? {
-    id: session.user.id,
-    email: session.user.email,
-    full_name: session.user.name,
-    is_admin: session.user.isAdmin,
-    pack_id: session.user.packId,
+  const currentUser = user ? {
+    id: user.id,
+    email: user.primaryEmail || '',
+    full_name: user.displayName || null,
+    is_admin: user.clientMetadata?.is_admin || false, // Check client metadata for admin status
+    pack_id: user.clientMetadata?.pack_id || 'free', // Check client metadata for pack
   } : null
 
   return (
@@ -217,7 +219,7 @@ export default function Header() {
             </button>
 
             {/* User Menu - Desktop Only */}
-            {user && !user.is_admin && (
+            {currentUser && !currentUser.is_admin && (
               <>
                 <Link href="/dashboard" className="hidden lg:flex items-center space-x-2 px-4 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50/50 dark:hover:bg-gray-800/50 rounded-lg transition-all duration-200 border border-blue-200/50 dark:border-blue-800/50">
                   <User className="w-4 h-4" />
@@ -237,7 +239,7 @@ export default function Header() {
               </>
             )}
             
-            {user?.is_admin && (
+            {currentUser?.is_admin && (
               <>
                 <Link href="/admin" className="hidden lg:flex items-center space-x-2 px-4 py-2 text-sm font-semibold bg-gradient-to-r from-purple-600 via-purple-700 to-purple-800 text-white hover:from-purple-700 hover:via-purple-800 hover:to-purple-900 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg border border-purple-500/20">
                   <Shield className="w-4 h-4" />
@@ -258,7 +260,7 @@ export default function Header() {
             )}
 
             {/* Login Button - Desktop */}
-            {!user && (
+            {!currentUser && (
               <Link 
                 href="/auth/login"
                 className="hidden lg:inline-flex items-center px-5 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-sm font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
@@ -386,7 +388,7 @@ export default function Header() {
                   🇺🇸 US Resources
                 </Link>
               )}
-              {!user?.is_admin && (
+              {!currentUser?.is_admin && (
                 <Link 
                   href="/dashboard" 
                   onClick={() => setIsOpen(false)}
@@ -407,7 +409,7 @@ export default function Header() {
               <div className="h-px bg-gray-200 dark:bg-gray-700 my-4"></div>
               
               {/* User Actions */}
-              {user && !user.is_admin && (
+              {currentUser && !currentUser.is_admin && (
                 <>
                   <Link 
                     href="/dashboard" 
@@ -429,7 +431,7 @@ export default function Header() {
                 </>
               )}
               
-              {user?.is_admin && (
+              {currentUser?.is_admin && (
                 <>
                   <Link 
                     href="/admin" 
