@@ -84,9 +84,6 @@ const nextConfig: NextConfig = {
     ]
   },
 
-  // Output configuration
-  output: 'standalone',
-  
   // React strict mode for better development
   reactStrictMode: true,
   
