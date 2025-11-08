@@ -47,6 +47,9 @@
     "stripe": "^19.2.0",
     "zod": "^4.1.12"
   },
+  "engines": {
+    "node": "18.x"
+  },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/next-auth": "^3.13.0",
