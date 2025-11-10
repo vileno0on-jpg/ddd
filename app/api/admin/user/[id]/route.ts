@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { sql } from '@/lib/neon/db'
+import { createClient } from '@/lib/supabase/server'
 
 export async function GET(
   req: NextRequest,
@@ -14,43 +14,48 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    if (!sql) {
-      return NextResponse.json({ error: 'Database not available' }, { status: 500 })
-    }
-
+    const supabase = await createClient()
     const { id: userId } = await params
 
     // Get user profile
-    const profileResult = await sql`
-      SELECT * FROM profiles WHERE id = ${userId}
-    `
-    const profile = profileResult[0] as any
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single()
 
-    if (!profile) {
+    if (profileError || !profile) {
+      console.error('Profile fetch error:', profileError)
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
     // Get user's subscriptions
-    const subscriptions = await sql`
-      SELECT * FROM subscriptions WHERE user_id = ${userId} ORDER BY created_at DESC
-    `
+    const { data: subscriptions, error: subsError } = await supabase
+      .from('subscriptions')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
 
     // Get user's payments
-    const payments = await sql`
-      SELECT * FROM payments WHERE user_id = ${userId} ORDER BY created_at DESC LIMIT 20
-    `
+    const { data: payments, error: paymentsError } = await supabase
+      .from('payments')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(20)
 
     // Get user's chat messages count
-    const messageCountResult = await sql`
-      SELECT COUNT(*) as count FROM chat_messages WHERE user_id = ${userId}
-    `
-    const messageCount = Number(messageCountResult[0]?.count || 0)
+    const { count: messageCount, error: countError } = await supabase
+      .from('chat_messages')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
 
     // Get user limits
-    const limitsResult = await sql`
-      SELECT * FROM user_limits WHERE user_id = ${userId}
-    `
-    const limits = limitsResult[0] as any
+    const { data: limits, error: limitsError } = await supabase
+      .from('user_limits')
+      .select('*')
+      .eq('user_id', userId)
+      .single()
 
     return NextResponse.json({
       profile,
@@ -76,46 +81,64 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    if (!sql) {
-      return NextResponse.json({ error: 'Database not available' }, { status: 500 })
-    }
-
+    const supabase = await createClient()
     const { id: userId } = await params
     const { packId, isAdmin, fullName, packExpiresAt } = await req.json()
 
-    // Update fields individually to handle conditionals properly
+    // Prepare update object
+    const updates: any = {}
+    updates.updated_at = new Date().toISOString()
+
     if (packId !== undefined) {
+      updates.pack_id = packId
       if (packExpiresAt !== undefined) {
-        await sql`
-          UPDATE profiles
-          SET pack_id = ${packId}, 
-              pack_expires_at = ${packExpiresAt || null}::timestamp with time zone,
-              updated_at = NOW()
-          WHERE id = ${userId}
-        `
-      } else {
-        await sql`
-          UPDATE profiles
-          SET pack_id = ${packId}, updated_at = NOW()
-          WHERE id = ${userId}
-        `
+        updates.pack_expires_at = packExpiresAt
       }
     }
-    
-    if (isAdmin !== undefined) {
-      await sql`
-        UPDATE profiles
-        SET is_admin = ${isAdmin}, updated_at = NOW()
-        WHERE id = ${userId}
-      `
+
+    // Update profile fields
+    if (Object.keys(updates).length > 1) { // More than just updated_at
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update(updates)
+        .eq('id', userId)
+
+      if (updateError) {
+        console.error('Profile update error:', updateError)
+        return NextResponse.json({ error: 'Failed to update profile' }, { status: 500 })
+      }
     }
-    
+
+    // Update admin status separately if provided
+    if (isAdmin !== undefined) {
+      const { error: adminError } = await supabase
+        .from('profiles')
+        .update({
+          is_admin: isAdmin,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', userId)
+
+      if (adminError) {
+        console.error('Admin status update error:', adminError)
+        return NextResponse.json({ error: 'Failed to update admin status' }, { status: 500 })
+      }
+    }
+
+    // Update full name separately if provided
     if (fullName !== undefined) {
-      await sql`
-        UPDATE profiles
-        SET full_name = ${fullName}, updated_at = NOW()
-        WHERE id = ${userId}
-      `
+      const { error: nameError } = await supabase
+        .from('profiles')
+        .update({
+          full_name: fullName,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', userId)
+
+      if (nameError) {
+        console.error('Full name update error:', nameError)
+        return NextResponse.json({ error: 'Failed to update full name' }, { status: 500 })
+      }
     }
 
     return NextResponse.json({ message: 'User updated successfully' })

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { sql } from '@/lib/neon/db'
+import { createClient } from '@/lib/supabase/server'
 import bcrypt from 'bcryptjs'
 
 /**
@@ -28,76 +28,115 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    if (!sql) {
-      return NextResponse.json(
-        { error: 'Database not available' },
-        { status: 500 }
-      )
-    }
+    const supabase = await createClient()
 
     // Check if user already exists
-    const existingUsers = await sql`
-      SELECT id FROM users WHERE email = ${email}
-    `
+    const { data: existingUsers, error: checkError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('email', email)
+      .single()
 
     let userId
 
-    if (existingUsers.length > 0) {
+    if (!checkError && existingUsers) {
       // User exists - update to admin
-      userId = existingUsers[0].id
+      userId = existingUsers.id
 
       // Hash password
       const hashedPassword = await bcrypt.hash(password, 10)
 
       // Update user password
-      await sql`
-        UPDATE users
-        SET password_hash = ${hashedPassword},
-            updated_at = NOW()
-        WHERE id = ${userId}
-      `
+      const { error: userUpdateError } = await supabase
+        .from('users')
+        .update({
+          password_hash: hashedPassword,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', userId)
+
+      if (userUpdateError) {
+        console.error('User update error:', userUpdateError)
+        return NextResponse.json({ error: 'Failed to update user' }, { status: 500 })
+      }
 
       // Update profile to admin
-      await sql`
-        UPDATE profiles
-        SET is_admin = TRUE,
-            full_name = ${fullName},
-            updated_at = NOW()
-        WHERE id = ${userId}
-      `
+      const { error: profileUpdateError } = await supabase
+        .from('profiles')
+        .update({
+          is_admin: true,
+          full_name: fullName,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', userId)
+
+      if (profileUpdateError) {
+        console.error('Profile update error:', profileUpdateError)
+        return NextResponse.json({ error: 'Failed to update profile' }, { status: 500 })
+      }
     } else {
       // Create new user
       const hashedPassword = await bcrypt.hash(password, 10)
 
-      const newUserResult = await sql`
-        INSERT INTO users (email, password_hash, email_verified)
-        VALUES (${email}, ${hashedPassword}, TRUE)
-        RETURNING id
-      `
-      userId = newUserResult[0].id
+      const { data: newUser, error: userCreateError } = await supabase
+        .from('users')
+        .insert({
+          email,
+          password_hash: hashedPassword,
+          email_verified: true
+        })
+        .select('id')
+        .single()
+
+      if (userCreateError || !newUser) {
+        console.error('User creation error:', userCreateError)
+        return NextResponse.json({ error: 'Failed to create user' }, { status: 500 })
+      }
+
+      userId = newUser.id
 
       // Create admin profile
-      await sql`
-        INSERT INTO profiles (id, email, full_name, pack_id, is_admin)
-        VALUES (${userId}, ${email}, ${fullName}, 'free', TRUE)
-      `
+      const { error: profileCreateError } = await supabase
+        .from('profiles')
+        .insert({
+          id: userId,
+          email,
+          full_name: fullName,
+          pack_id: 'free',
+          is_admin: true
+        })
+
+      if (profileCreateError) {
+        console.error('Profile creation error:', profileCreateError)
+        return NextResponse.json({ error: 'Failed to create profile' }, { status: 500 })
+      }
 
       // Create user limits
       const today = new Date().toISOString().split('T')[0]
-      await sql`
-        INSERT INTO user_limits (user_id, messages_today, last_reset_date)
-        VALUES (${userId}, 0, ${today})
-      `
+      const { error: limitsError } = await supabase
+        .from('user_limits')
+        .insert({
+          user_id: userId,
+          messages_today: 0,
+          last_reset_date: today
+        })
+
+      if (limitsError) {
+        console.error('Limits creation error:', limitsError)
+      }
     }
 
     // Verify
-    const verifyResult = await sql`
-      SELECT id, email, full_name, is_admin, pack_id
-      FROM profiles
-      WHERE id = ${userId}
-    `
+    const { data: admin, error: verifyError } = await supabase
+      .from('profiles')
+      .select('id, email, full_name, is_admin, pack_id')
+      .eq('id', userId)
+      .single()
 
-    const admin = verifyResult[0]
+    if (verifyError || !admin) {
+      console.error('Verification error:', verifyError)
+      return NextResponse.json({ error: 'Failed to verify admin creation' }, { status: 500 })
+    }
 
     return NextResponse.json({
       success: true,

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { sql } from '@/lib/neon/db'
+import { createClient } from '@/lib/supabase/server'
 
 export async function POST(req: NextRequest) {
   try {
@@ -9,17 +9,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Email is required' }, { status: 400 })
     }
 
-    if (!sql) {
-      return NextResponse.json({ error: 'Database not available' }, { status: 500 })
-    }
+    const supabase = await createClient()
 
     // Check if user exists
-    const users = await sql`
-      SELECT id, email FROM users
-      WHERE email = ${email}
-    `
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('id, email')
+      .eq('email', email)
+      .single()
 
-    if (!users || users.length === 0) {
+    if (error || !user) {
       // Don't reveal if user exists or not (security best practice)
       return NextResponse.json({ 
         message: 'If an account with that email exists, we\'ve sent a password reset link.' 

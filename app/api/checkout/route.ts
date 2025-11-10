@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { stripe } from '@/lib/stripe'
-import { sql } from '@/lib/neon/db'
+import { createClient } from '@/lib/supabase/server'
 
 export async function POST(req: NextRequest) {
   try {
@@ -24,15 +24,17 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    const supabase = await createClient()
+
     // Get user profile
-    const profiles = await sql`
-      SELECT * FROM profiles
-      WHERE id = ${session.user.id}
-    `
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', session.user.id)
+      .single()
 
-    const profile = profiles[0] as any
-
-    if (!profile) {
+    if (profileError || !profile) {
+      console.error('Profile fetch error:', profileError)
       return NextResponse.json(
         { error: 'Profile not found' },
         { status: 404 }
