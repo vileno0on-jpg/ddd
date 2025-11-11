@@ -1,8 +1,16 @@
 'use client'
 
 import { SessionProvider as NextAuthSessionProvider } from 'next-auth/react'
+import { ReactNode } from 'react'
 
-export function SessionProvider({ children }: { children: React.ReactNode }) {
-  return <NextAuthSessionProvider>{children}</NextAuthSessionProvider>
+interface SessionProviderProps {
+  children: ReactNode
 }
 
+export function SessionProvider({ children }: SessionProviderProps) {
+  return (
+    <NextAuthSessionProvider>
+      {children}
+    </NextAuthSessionProvider>
+  )
+}

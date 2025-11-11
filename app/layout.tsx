@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-// Removed StackAuthProvider import
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { SessionProvider } from "@/components/providers/SessionProvider";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -36,7 +36,9 @@ export default function RootLayout({
     <html lang="en" className="scroll-smooth" suppressHydrationWarning>
       <body className={`${inter.variable} antialiased bg-white dark:bg-gray-900`} suppressHydrationWarning>
         <ErrorBoundary>
-          {children}
+          <SessionProvider>
+            {children}
+          </SessionProvider>
         </ErrorBoundary>
       </body>
     </html>
