@@ -2,12 +2,11 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useStackApp } from '@stackframe/stack'
+import { signIn } from 'next-auth/react'
 import Link from 'next/link'
 
 export default function LoginPage() {
   const router = useRouter()
-  const stackApp = useStackApp()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -19,7 +18,16 @@ export default function LoginPage() {
     setError('')
 
     try {
-      await stackApp.signInWithCredential({ email, password })
+      const result = await signIn('credentials', {
+        email,
+        password,
+        redirect: false,
+      })
+
+      if (result?.error) {
+        throw new Error(result.error)
+      }
+
       router.push('/dashboard')
     } catch (err: any) {
       setError(err.message || 'Invalid email or password')

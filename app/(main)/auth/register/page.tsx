@@ -2,12 +2,11 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useStackApp } from '@stackframe/stack'
+// Removed Stack import
 import Link from 'next/link'
 
 export default function RegisterPage() {
   const router = useRouter()
-  const stackApp = useStackApp()
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -20,13 +19,27 @@ export default function RegisterPage() {
     setError('')
 
     try {
-      // Register and sign in user with Stack Auth
-      await stackApp.signUpWithCredential({
-        email,
-        password,
+      // Register user via API
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email,
+          password,
+          fullName,
+        }),
       })
 
-      router.push('/dashboard')
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Registration failed')
+      }
+
+      // Registration successful, redirect to login
+      router.push('/auth/login?message=Registration successful! Please sign in.')
     } catch (err: any) {
       setError(err.message || 'Registration failed')
     } finally {

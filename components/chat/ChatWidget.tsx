@@ -14,9 +14,20 @@ interface ChatMessage {
 }
 
 export default function ChatWidget() {
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
   const { data: session } = useSession()
   const pathname = usePathname()
   const [isOpen, setIsOpen] = useState(false)
+
+  // Don't render during SSR
+  if (!mounted) {
+    return null
+  }
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)

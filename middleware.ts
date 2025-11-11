@@ -1,53 +1,57 @@
-import { stackServerApp } from './lib/stack'
+import { withAuth } from "next-auth/middleware"
 import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/server'
 
-export async function middleware(request: NextRequest) {
-  // Skip authentication during build time when environment variables aren't available
-  if (!process.env.NEXT_PUBLIC_STACK_PROJECT_ID || !process.env.STACK_SECRET_SERVER_KEY) {
+export default withAuth(
+  function middleware(req) {
+    // Additional custom middleware logic can go here
     return NextResponse.next()
+  },
+  {
+    callbacks: {
+      authorized: ({ token, req }) => {
+        const { pathname } = req.nextUrl
+
+        // Public routes - always allow
+        if (pathname.startsWith('/auth/') ||
+            pathname.startsWith('/api/auth/') ||
+            pathname === '/' ||
+            pathname.startsWith('/about') ||
+            pathname.startsWith('/pricing') ||
+            pathname.startsWith('/contact') ||
+            pathname.startsWith('/visas') ||
+            pathname.startsWith('/citizenship') ||
+            pathname.startsWith('/employment') ||
+            pathname.startsWith('/faq') ||
+            pathname.startsWith('/resources') ||
+            pathname.startsWith('/tools') ||
+            pathname.startsWith('/us-citizens') ||
+            pathname.startsWith('/cantons') ||
+            pathname.startsWith('/quiz')) {
+          return true
+        }
+
+        // Protected routes - require authentication
+        if (pathname.startsWith('/dashboard') ||
+            pathname.startsWith('/profile') ||
+            pathname.startsWith('/api/user') ||
+            pathname.startsWith('/api/chat') ||
+            pathname.startsWith('/api/quiz') ||
+            pathname.startsWith('/api/modules')) {
+          return !!token
+        }
+
+        // Admin routes - require authentication and admin role
+        if (pathname.startsWith('/admin') ||
+            pathname.startsWith('/api/admin')) {
+          return !!(token && token.role === 'admin')
+        }
+
+        // Default - allow
+        return true
+      },
+    },
   }
-
-  let user
-  let isSignedIn = false
-
-  try {
-    if (stackServerApp) {
-      user = await stackServerApp.getUser()
-      isSignedIn = !!user
-    } else {
-      // Stack Auth not initialized, allow request
-      return NextResponse.next()
-    }
-  } catch (error) {
-    // If Stack Auth fails, allow the request to continue
-    console.warn('Stack Auth middleware error:', error)
-    return NextResponse.next()
-  }
-
-  // Protect authenticated routes
-  if (request.nextUrl.pathname.startsWith('/dashboard') ||
-      request.nextUrl.pathname.startsWith('/admin') ||
-      request.nextUrl.pathname.startsWith('/profile') ||
-      request.nextUrl.pathname.startsWith('/api/user') ||
-      request.nextUrl.pathname.startsWith('/api/admin') ||
-      request.nextUrl.pathname.startsWith('/api/chat') ||
-      request.nextUrl.pathname.startsWith('/api/quiz') ||
-      request.nextUrl.pathname.startsWith('/api/modules')) {
-
-    if (!isSignedIn) {
-      return NextResponse.redirect(new URL('/auth/login', request.url))
-    }
-
-    // Admin-only routes
-    if (request.nextUrl.pathname.startsWith('/admin') ||
-        request.nextUrl.pathname.startsWith('/api/admin')) {
-      // For now, allow all authenticated users - you can add role checking here
-    }
-  }
-
-  return NextResponse.next()
-}
+)
 
 export const config = {
   matcher: [

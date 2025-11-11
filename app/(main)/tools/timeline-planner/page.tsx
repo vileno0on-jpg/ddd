@@ -5,6 +5,8 @@ import { Calendar, Clock, CheckCircle, AlertCircle } from 'lucide-react'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
 
+export const dynamic = 'force-dynamic'
+
 export default function TimelinePlanner() {
   const [targetDate, setTargetDate] = useState('')
   const [nationality, setNationality] = useState<'eu' | 'non-eu'>('non-eu')

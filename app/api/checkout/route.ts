@@ -58,11 +58,19 @@ export async function POST(req: NextRequest) {
         ...(profile.metadata || {}),
         stripe_customer_id: customerId,
       }
-      await sql`
-        UPDATE profiles
-        SET metadata = ${JSON.stringify(updatedMetadata)}::jsonb
-        WHERE id = ${session.user.id}
-      `
+
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({
+          metadata: updatedMetadata,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', session.user.id)
+
+      if (updateError) {
+        console.error('Profile update error:', updateError)
+        return NextResponse.json({ error: 'Failed to save customer information' }, { status: 500 })
+      }
     }
 
     // Create checkout session

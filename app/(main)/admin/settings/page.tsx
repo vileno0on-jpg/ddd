@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+
+export const dynamic = 'force-dynamic'
 import { useRouter } from 'next/navigation'
 import { useSession, signOut } from 'next-auth/react'
 import { motion } from 'framer-motion'
